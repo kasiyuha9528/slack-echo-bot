@@ -50,7 +50,31 @@
 
 ### ステップ2:ローカルで Bolt を起動し、ngrok で疎通確認
 
-<!-- 作業後に記入 -->
+**やったこと**
+- Node.js のプロジェクトを作り、Bolt(v5.1.0)をインストールした。ESM 形式で書き、秘密の値は `.env` に置いた(Git に載せるのは `.env.example` だけ)
+- `node --env-file=.env src/app.js` で、`.env` を読み込んで Bot を起動した
+- ngrok(静的ドメイン)で、ローカルの Bot をインターネットに公開した
+- Slack の Request URL を登録し、**Verified** を確認した。`app_mention` のイベントが Bot に届き、ログに出た
+
+**つまずいたこと**(原因が分かったものと、分からなかったものを分けて記録する)
+
+| # | 内容 | 原因 | 対処 |
+|---|---|---|---|
+| 1 | ngrok.exe が消え、起動できなくなった | ウイルスバスターが PUA として検出して削除した(分かった)。ストア版は状態が `Tampered` になった | zip 版を専用フォルダに置き、例外設定を追加。署名(Authenticode)が有効なことを確認した |
+| 2 | エラー画面に authtoken が写った | エラー出力に、入力したコマンドがそのまま出るため(分かった) | authtoken を作り直した |
+| 3 | Event Subscriptions に「Socket Mode is enabled」と出た | Socket Mode が有効だった(分かった) | Request URL 方式にするため、オフにした |
+| 4 | Request URL の確認が失敗し、Bot に `signature mismatch` と出た | **未特定**。`.env` の値を再コピーして保存し、Bot を再起動したら Verified になった。値の取り違えか、再起動漏れの可能性があるが、どちらかは確認できていない | `.env` の値の再コピーと、Bot の再起動 |
+| 5 | メンションしても、ngrok にイベントが届かなかった | **未特定**。設定はすべて保存済みだったが、「Reinstall」を押すと届くようになった | アプリの再インストール |
+| 6 | Bot Token がスクリーンショットに全文写った | Install App の画面で、トークンが表示されていた(分かった)。再インストールだけでは、トークンは変わらなかった | `auth.revoke` で失効させ、再インストールで再発行して、`.env` を更新。Bot をチャンネルに招待し直した |
+| 7 | PowerShell で `.env` の日本語が文字化けし、点検コマンドが空振りした | `Get-Content` の既定の文字コードで読んだため(`-Encoding UTF8` で正しく読めた)。点検コマンドの前提が足りなかった | `-Encoding UTF8` を付けて点検をやり直した |
+
+**理解したこと**
+- 経路の確認は、**ngrok の記録(`127.0.0.1:4040`)と、Bot のログの両方**を見ると、切り分けができる。「届いていない」のか、「届いたが拒否した」のかが分かる
+- 以前に出た 404 と 401 は、手で送ったテスト(GET と、署名なしの POST)に、Bolt が正しく反応した結果だった。Bolt は、署名のないリクエストを拒否し、そのことをログに出す
+- Slack の確認(Verified)は、本物の Slack からの署名つきリクエストを、Bot が受けて応答できるかのテストになる
+- 実際のメンションのイベントでは、`text` の先頭に `<@Botのユーザーid>` が付く。返信に使う `ts`(メッセージの時刻 ID)と `channel` も含まれる。画像付きの場合の形は、まだ見ていない(ステップ3で、実際に送って確認する)
+- 秘密の値(トークンなど)が、チャットやスクリーンショットに出たら、その場で失効させて作り直す
+- 原因が分からなかったことは、「未特定」と記録する。分かったふりをしない
 
 ### ステップ3:オウム返しロジックの実装
 
@@ -72,7 +96,12 @@
 
 | 用語 | 意味 | このプロジェクトでの使いどころ |
 |---|---|---|
-| <!-- 実装しながら追加 --> | | |
+| `import { App } from "@slack/bolt"` | ESM 形式で、Bolt の `App`(Bot の本体)を読み込む | `src/app.js` の1行目 |
+| `process.env` | 環境変数を読む入れ物。`.env` の値がここに入る | Bot トークンと Signing Secret の取得 |
+| `app.event("app_mention", ...)` | 指定したイベントが届いたときの処理を登録する | メンションの受け取り |
+| `await app.start(port)` | Bot を起動し、待ち受けを始める(`await` は、完了を待つ指定) | 起動処理 |
+| `node --env-file=.env src/app.js` | `.env` を読み込んで、Bot を起動するコマンド | 開発中の起動方法 |
+| `Get-Content .env -Encoding UTF8` | PowerShell でファイルを UTF-8 として読む | 文字化けの回避 |
 
 ### 用語
 
@@ -95,3 +124,20 @@
 | Bolt | Slack アプリを作るための公式フレームワーク | Bot の本体 |
 | Node.js | JavaScript をブラウザの外で動かす実行環境 | v24.21.0 を使用 |
 | `.git` | Git が履歴を保存する隠しフォルダ | ホームフォルダに誤って作られていた |
+| PUA | 「望ましくないかもしれないアプリ」の略。ウイルスではないが、ウイルス対策ソフトが警告する対象 | ngrok が検出されて削除された |
+| 例外設定 | ウイルス対策ソフトの検査から、特定のフォルダやファイルを外す設定 | ngrok のフォルダを除外した |
+| Authenticode 署名 | Windows の実行ファイルに付く、作成元を示すデジタル署名 | ngrok.exe が本物かを確認した |
+| authtoken | ngrok のアカウントと PC を結びつける鍵。秘密の値 | エラー画面に写り、作り直した |
+| 静的ドメイン | ngrok が貸してくれる、変わらない URL | Request URL に使う |
+| Request URL | Slack がイベントを送る先の URL | `https://…ngrok-free.dev/slack/events` |
+| `url_verification`(challenge) | Request URL 登録時に、Slack が送る確認。受け取った `challenge` の値を、そのまま返す必要がある | Bolt が自動で応答し、Verified になった |
+| 署名検証(`signature mismatch`) | Slack が付けた署名と、Bot が計算した署名が一致するかを確かめること。不一致だと拒否される | Signing Secret の値が合っていないと起きる |
+| ngrok inspector | ngrok を通ったリクエストと応答を見られる画面(`http://127.0.0.1:4040`) | 「届いたか」の切り分けに使った |
+| ステータスコード | 応答の結果を示す数字。200=成功、401=認証できない、404=見つからない | ngrok の記録で、Bot の応答を判断した |
+| 再インストール | Slack App をワークスペースに入れ直すこと。トークンは、そのままのことがある | イベントが届くようになった(原因は未特定) |
+| トークンの失効(`auth.revoke`) | 発行済みのトークンを使えなくするための Slack の API | 画面に写った Bot トークンを無効にした |
+| 文字コード(UTF-8)と文字化け | 文字をデータにする方式。読む側が別の方式だと、文字化けする | PowerShell で `.env` の日本語が崩れた |
+| ESM と CommonJS | JavaScript のモジュール(部品)の2つの書き方。`import` を使うのが ESM | `package.json` に `"type": "module"` を指定した |
+| `.env` と `.env.example` | `.env` は実際の秘密の値を置くファイル(Git に載せない)。`.env.example` は、値を空にした見本(Git に載せる) | 秘密の値の管理 |
+| npm、`package.json`、`package-lock.json`、`node_modules` | npm は部品の管理ツール。`package.json` は設定、`package-lock.json` は入れた版の記録、`node_modules` は部品の置き場所(Git に載せない) | Bolt のインストール |
+| `--env-file` | Node.js の起動時に、`.env` を読み込む指定 | dotenv というライブラリを使わずに済む |

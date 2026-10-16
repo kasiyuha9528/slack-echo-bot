@@ -45,11 +45,21 @@ Slack でメンションされると、同じ文章をスレッドに返信す�
 
 ## 5. 学んだこと
 
-<!-- 作業を進めながら記入。詳しくは docs/learning-notes.md -->
+詳しくは [docs/learning-notes.md](docs/learning-notes.md) にまとめています。
+
+- Slack App の作り方と、スコープ・イベント購読の考え方
+- Bot トークンや Signing Secret など、秘密の値の扱い方
+- Git は、`git init` を実行した場所を管理する。実行場所の確認が大切
+- 管理画面は予告なく変わるので、手順書より実際の画面を見て判断する
+
+<!-- 以降のステップで追記 -->
 
 ## 6. こだわった点
 
-<!-- 作業を進めながら記入 -->
+- **最小権限**:スコープは `app_mentions:read` と `chat:write` の2つだけ。イベントも `app_mention` だけ
+- **秘密の値の管理**:トークンや Signing Secret は `.env` に置き、GitHub に上げない
+
+<!-- 以降のステップで追記 -->
 
 ## 7. 今後の改善案
 
