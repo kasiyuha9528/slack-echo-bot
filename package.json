@@ -2,7 +2,7 @@
   "name": "slack-echo-bot",
   "version": "1.0.0",
   "description": "Slack でメンションされると、同じ文章をスレッドに返信する「オウム返し Bot」です。",
-  "main": "index.js",
+  "main": "src/app.js",
   "directories": {
     "doc": "docs"
   },
