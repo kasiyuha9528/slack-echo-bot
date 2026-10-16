@@ -1,0 +1,19 @@
+{
+  "name": "slack-echo-bot",
+  "version": "1.0.0",
+  "description": "Slack でメンションされると、同じ文章をスレッドに返信する「オウム返し Bot」です。",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "dependencies": {
+    "@slack/bolt": "^5.1.0"
+  }
+}
