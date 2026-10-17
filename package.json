@@ -15,6 +15,10 @@
   "license": "ISC",
   "type": "module",
   "dependencies": {
-    "@slack/bolt": "^5.1.0"
+    "@slack/bolt": "^5.1.0",
+    "@vercel/slack-bolt": "^1.7.3"
+  },
+  "engines": {
+    "node": "24.x"
   }
 }
