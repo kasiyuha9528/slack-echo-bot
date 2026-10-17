@@ -113,11 +113,66 @@
 
 ### ステップ4:Vercel 向けに構成を調整してデプロイ
 
-<!-- 作業後に記入 -->
+**やったこと**
+- Vercel 用の公式ライブラリ `@vercel/slack-bolt` を、インストール済みのコードで確認してから使った(`VercelReceiver`、`createHandler`、`deferInitialization`)
+- 返信の処理を `src/handlers.js` に切り出し、ローカル用(`src/app.js`)と Vercel 用(`api/slack/events.js`)の両方から使う形にした
+- GitHub の公開リポジトリ `kasiyuha9528/slack-echo-bot` を作り、コミット履歴の全体に秘密の値が含まれていないことを調べてから push した
+- Vercel(Hobby プラン)に GitHub のリポジトリを取り込んだ。Application Preset は「Other」、Build などの設定は既定のまま
+- 環境変数 `SLACK_BOT_TOKEN` と `SLACK_SIGNING_SECRET` を、Vercel の画面で登録した。**Sensitive(登録後に値を隠す設定)**を使った
+- デプロイは成功(12秒)。Deployment Summary の Functions に、`/api/slack/events`(Node.js 24.x)が作られていた
+
+**つまずいたこと**
+
+| # | 内容 | 原因 | 対処 |
+|---|---|---|---|
+| 1 | デプロイ直後のプレビューが「404 NOT_FOUND」だった | トップページ(`/`)用のファイルが、このプロジェクトにないため(推測。Functions に入口があることは、あとで確認した) | 入口の URL(`/api/slack/events`)側で確認した |
+| 2 | ブラウザで入口の URL を開くと「HTTP ERROR 405」が出た | 入口は POST だけを受け付ける作りで、ブラウザで開く操作は GET のため(分かった。Request Logs でも `GET 405` と確認した) | 異常ではないと判断した。404 ではないので、関数が存在することの確認になった |
+| 3 | 「Logs」を開いたが、探していたビルドのログではなかった | Vercel の「Logs」(Request Logs)は、アクセスの記録で、ビルドのログとは別だった(分かった) | Deployments → デプロイの詳細 → 「Deploy Logs」を開いた |
+
+**理解したこと**
+- Vercel の関数は、常に動いているサーバーではなく、**リクエストが来たときに動く**。そのため、ローカルの `app.start()` のような待ち受けは使わず、`export const POST` で受け口を渡す
+- 画面の「Logs」(アクセスの記録)と、デプロイの詳細の「Deploy Logs」(ビルドの記録)は別物。調べたいことで、見る場所が変わる
+- HTTP 405 は「その URL はあるが、その方法(メソッド)は受け付けない」という意味。404(その URL がない)と区別すると、関数の存在を確認できる
+- ローカルの `.env` と、Vercel の環境変数は、**別々の場所**にある。Vercel 側にも、同じ値を登録しないと動かない
+- 環境変数を登録する画面は、値が写りやすい。スクリーンショットを撮らない。Sensitive を使うと、登録後は値が見えなくなる
 
 ### ステップ5:本番 URL への切り替えと達成基準の確認
 
-<!-- 作業後に記入 -->
+**やったこと**
+- Vercel の Request Logs を「Live」にしてから、Slack の Request URL を `https://slack-echo-bot.vercel.app/api/slack/events` に変更した
+- Slack で **Verified** になり、Vercel のログに `POST 200 /api/slack/events` が出た。Deployment Protection に、Slack の通信が止められていないことも分かった
+- メンションを送ると、返信が **2秒以内**に届いた。Vercel のログにも「メンション受信」が出た
+- ステップ3の6パターンを、Vercel 上でも確認した(下の表)
+
+**確認した6パターン(Vercel 上)**
+
+| # | 送ったもの | 結果 |
+|---|---|---|
+| ① | 文章だけ | そのまま返信 |
+| ② | メンションだけ | 「本文が空っぽ」のお知らせ |
+| ③ | 文章 + 画像 | 断りの一言 + 本文 |
+| ④ | 画像だけ | 断り + 文字を入れてほしいというお願い |
+| ⑤ | `@channel` を含む文章 | 通知が飛ばない文字に変えて返信 |
+| ⑥ | スレッドの中でメンション | 同じスレッドに返信 |
+
+すべて期待どおりで、二重返信はなかった。
+
+**達成基準の確認**
+
+| 基準 | 結果 |
+|---|---|
+| Slack で、3秒以内に反応する | 2秒以内(普通の文章で1回確認) |
+| ngrok ではなく、ホスティングの URL で動く | Vercel で、6パターンとも確認した |
+| Bot トークンを環境変数で管理する | ローカルは `.env`、Vercel は環境変数 |
+
+**まだ確認できていないこと**
+- Slack の**再送が起きたときに、二重処理の防止が効くか**。今回は再送が起きていないので、「二重返信がなかった」ことは、防止が効いた証拠にはならない。しかも、防止のメモリは、サーバーレスでは、リクエストをまたいで残らない可能性がある
+- **しばらく使わなかったあとの、最初のメンション**(コールドスタート)が、3秒以内に収まるか。計測は1回だけで、これは「通常の状態」の結果
+
+**理解したこと**
+- Verified は、「本物の Slack の署名つきの通信が、Vercel 上の Bot に届き、検証を通った」ことの確認になる。ブラウザの GET では、これは確認できない
+- Request URL を切り替えると、イベントの届け先が変わる。ローカル(ngrok)の Bot には、届かなくなる
+- 「動いた」ことと、「再送や、時間のかかるケースでも動く」ことは別。確認できていないことは、分けて記録する
 
 ---
 
@@ -142,6 +197,10 @@
 | `??` と `?.` | `??` は、左が空(`null` か `undefined`)のときだけ右を使う。`?.` は、途中が空でもエラーにせず `undefined` にする | `event.thread_ts ?? event.ts`、`event.files?.length` |
 | `node:test` と `assert.equal` | Node.js 標準のテスト機能。`assert.equal(結果, 期待する値)` で、一致を確かめる | `reply.test.js` と `dedupe.test.js` |
 | `npm test` と `npm start` | `package.json` の `scripts` に登録したコマンドを実行する | テストの実行と、Bot の起動 |
+| `export const POST` | POST リクエストを受け付ける関数を、外に公開する書き方(Vercel の Web 標準の形式) | `api/slack/events.js` |
+| `VercelReceiver` と `createHandler(app, receiver)` | Vercel 用の受け口と、それを Bolt につなぐ関数 | Vercel での Bot の受付 |
+| `deferInitialization: true` | Bolt の初期化を、起動時ではなく、リクエストが来たときに遅らせる設定 | リクエストごとに初期化する Vercel の仕組みに合わせた |
+| `engines.node` | `package.json` で、使う Node.js のバージョンを指定する項目 | `"24.x"` |
 
 ### 用語
 
@@ -190,3 +249,14 @@
 | `ignoreSelf` | Bot 自身の発言を、無視する Bolt の設定(既定でオン) | Bot が自分に反応し続けるのを防ぐ |
 | 自動テスト | プログラムの動きを、コードで確かめる仕組み | Slack なしで、4つの分岐を確認できる |
 | JSON の構文エラー | JSON の書き方が正しくないこと。末尾に余計な文字があっても、起きる | `package.json` で `EJSONPARSE` が出た |
+| Vercel | Web アプリや関数を、インターネットに公開するサービス | Bot のホスティング先 |
+| サーバーレス関数 | 常時動くサーバーではなく、リクエストが来たときだけ動く関数 | `/api/slack/events` |
+| デプロイ | 作ったものを、公開できる状態にすること | GitHub の push で、Vercel が自動で行う |
+| Hobby プラン | Vercel の個人向けの無料プラン | 今回のホスティング |
+| 環境変数(Vercel)と Sensitive | Vercel の画面で登録する、秘密の値の置き場。Sensitive を使うと、登録後に値が画面で見えなくなる | `SLACK_BOT_TOKEN` と `SLACK_SIGNING_SECRET` |
+| Request Logs と Deploy Logs | Request Logs は、届いたアクセスの記録。Deploy Logs は、ビルドとデプロイの記録 | 動作の確認と、ビルドの確認で使い分けた |
+| Deployment Protection | Vercel の、デプロイへのアクセスを制限する機能 | Slack の通信が止められないことを確認した |
+| HTTP 405 | URL はあるが、その方法(メソッド)は受け付けないという応答 | ブラウザ(GET)で入口を開いたときの表示 |
+| コールドスタート | しばらく使われなかったあとの、最初の起動に時間がかかること | 3秒以内に収まるか、未確認 |
+| GitHub のリモート(`origin`)と push | リモートは、GitHub 上の保管先。push は、手元の履歴を送ること | Vercel が読む元になる |
+| 公開リポジトリとライセンス(MIT) | 公開しても、ライセンスがなければ、他の人は原則、再利用できない。MIT は、著作権表示を残せば、自由に使える | 公開リポジトリ |
