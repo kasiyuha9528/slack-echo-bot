@@ -11,8 +11,8 @@
     "start": "node --env-file=.env src/app.js"
   },
   "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "author": "kasiyuha9528",
+  "license": "MIT",
   "type": "module",
   "dependencies": {
     "@slack/bolt": "^5.1.0",
